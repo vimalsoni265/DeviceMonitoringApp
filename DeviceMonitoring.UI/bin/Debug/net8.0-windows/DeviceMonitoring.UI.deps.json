@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "DeviceMonitoring.UI/1.0.0": {
+        "runtime": {
+          "DeviceMonitoring.UI.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "DeviceMonitoring.UI/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
