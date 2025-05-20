@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Devices\DeviceBase.cs" />
+    <ProjectReference Include="..\DeviceMonitoring.Core\DeviceMonitoring.Core.csproj" />
   </ItemGroup>
 
 </Project>

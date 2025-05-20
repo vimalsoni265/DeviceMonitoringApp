@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceMonitoring.UI", "Devi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceMonitoring.Core", "DeviceMonitoring.Core\DeviceMonitoring.Core.csproj", "{B3E914D9-8471-4352-A44B-8057AB669886}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceMonitoring.Core.Test", "DeviceMonitoring.Core.Test\DeviceMonitoring.Core.Test.csproj", "{E7EDB48D-F1F1-47EE-9EB5-174264A4570F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceMonitoring.Services", "DeviceMonitoring.Services\DeviceMonitoring.Services.csproj", "{60AFB8B4-7547-40DE-A2F1-57761F4009B1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +25,14 @@ Global
 		{B3E914D9-8471-4352-A44B-8057AB669886}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B3E914D9-8471-4352-A44B-8057AB669886}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B3E914D9-8471-4352-A44B-8057AB669886}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E7EDB48D-F1F1-47EE-9EB5-174264A4570F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E7EDB48D-F1F1-47EE-9EB5-174264A4570F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E7EDB48D-F1F1-47EE-9EB5-174264A4570F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E7EDB48D-F1F1-47EE-9EB5-174264A4570F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{60AFB8B4-7547-40DE-A2F1-57761F4009B1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{60AFB8B4-7547-40DE-A2F1-57761F4009B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{60AFB8B4-7547-40DE-A2F1-57761F4009B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{60AFB8B4-7547-40DE-A2F1-57761F4009B1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
