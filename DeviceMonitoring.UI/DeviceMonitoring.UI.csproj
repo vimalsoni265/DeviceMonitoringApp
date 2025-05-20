@@ -8,4 +8,9 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\DeviceMonitoring.Core\DeviceMonitoring.Core.csproj" />
+    <ProjectReference Include="..\DeviceMonitoring.Services\DeviceMonitoring.Services.csproj" />
+  </ItemGroup>
+
 </Project>
