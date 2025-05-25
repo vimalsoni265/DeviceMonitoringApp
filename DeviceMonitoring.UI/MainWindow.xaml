@@ -3,10 +3,49 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:usercontrols="clr-namespace:DeviceMonitoring.UI.UserControls"
         xmlns:local="clr-namespace:DeviceMonitoring.UI"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        mc:Ignorable="d" d:Height="1080" d:Width="1920"
+        Height="600" Width="800">
 
+    <Window.Resources>
+        <Style x:Key="HeaderBorder" TargetType="Border" BasedOn="{StaticResource MaterialDesignToolBarMainPanelBorderStyle}">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHueMidBrush}" />
+            <Setter Property="CornerRadius" Value="0 15 0 0" />
+            <Setter Property="Padding" Value="15" />
+        </Style>
+    </Window.Resources>
+    <Grid >
+        <Grid.RowDefinitions>
+            <RowDefinition Height="80"></RowDefinition>
+            <RowDefinition Height="*"></RowDefinition>
+            <RowDefinition Height="Auto"></RowDefinition>
+        </Grid.RowDefinitions>
+        <!--#region Main Header -->
+        <usercontrols:MainHeader/>
+        <!--#endregion-->
+        
+        <!--#region Main Content -->
+        <usercontrols:Dashboard Grid.Row="1" Background="Gainsboro"/>
+        <!--#endregion-->
+
+        <!--#region Footer -->
+        <Grid Grid.Row="2">
+            <StatusBar HorizontalContentAlignment="Right">
+                <StackPanel Orientation="Horizontal" Margin="5,0" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" />
+                    <TextBlock Text="Monitoring " Margin="5,0" />
+                    <TextBlock >
+                        <Run Text="{Binding Devices.MonitoringCount}" FontWeight="Bold" />
+                        <Run Text="/" />
+                        <Run Text="{Binding Devices.Count}" FontWeight="Bold" />
+                    </TextBlock>
+                </StackPanel>
+                
+            </StatusBar>
+        </Grid>
+        <!--#endregion-->
     </Grid>
 </Window>

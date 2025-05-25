@@ -9,6 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
+    <PackageReference Include="System.ObjectModel" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DeviceMonitoring.Core\DeviceMonitoring.Core.csproj" />
     <ProjectReference Include="..\DeviceMonitoring.Services\DeviceMonitoring.Services.csproj" />
   </ItemGroup>

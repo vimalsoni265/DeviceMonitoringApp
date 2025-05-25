@@ -1,0 +1,21 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Centralize colors to represent temperature  -->
+    <Color x:Key="ColdColor">#FF4CAF50</Color>
+    <Color x:Key="WarmColor">#FFFFEB3B</Color>
+    <Color x:Key="HotColor">#FFF44336</Color>
+    
+    <!-- Centralize brushes to represnt temperature -->
+    <SolidColorBrush x:Key="ColdBrush" Color="{StaticResource ColdColor}"/>
+    <SolidColorBrush x:Key="WarmBrush" Color="{StaticResource WarmColor}"/>
+    <SolidColorBrush x:Key="HotBrush" Color="{StaticResource HotColor}"/>
+
+    <!-- Custom HEX for Overall Theme -->
+    <SolidColorBrush x:Key="PrimaryHueMidBrush" Color="#455258" />
+    <SolidColorBrush x:Key="PrimaryHueMidBrushDark" Color="#39464E" />
+    <SolidColorBrush x:Key="PrimaryHueMidForegroundBrush" Color="White" />
+
+    <SolidColorBrush x:Key="SecondaryHueMidBrush" Color="#EF6C00" />    
+    <SolidColorBrush x:Key="SecondaryTextForeGround" Color="Orange" />
+    <SolidColorBrush x:Key="SecondaryHueMidForegroundBrush" Color="White" />
+</ResourceDictionary>

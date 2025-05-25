@@ -9,6 +9,7 @@ namespace DeviceMonitoring.UI
     /// </summary>
     public partial class App : Application
     {
+
     }
 
 }
