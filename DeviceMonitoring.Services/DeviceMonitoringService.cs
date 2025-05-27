@@ -2,6 +2,7 @@
 using DeviceMonitoring.Core.Devices;
 using DeviceMonitoring.Core.Exceptions;
 using DeviceMonitoring.Services.NewFolder;
+using System.Collections.Concurrent;
 
 namespace DeviceMonitoring.Services
 {
@@ -9,7 +10,7 @@ namespace DeviceMonitoring.Services
     {
         #region Private Fields
 
-        private readonly Dictionary<string, MonitoringEntryContract> m_monitoringMap;
+        private readonly ConcurrentDictionary<string, DeviceEntry> m_monitoringMap;
 
         private readonly CancellationTokenSource m_cts;
         private Task m_deviceMonitor;
@@ -52,11 +53,7 @@ namespace DeviceMonitoring.Services
             // Used TaskFactory + LongRunning because
             // we want dedicated threads and or need separation from the ThreadPool.
             m_cts = new CancellationTokenSource();
-            m_deviceMonitor = Task.Factory.StartNew(() =>
-                                    MonitorDevices(m_cts.Token),
-                                    m_cts.Token,
-                                    TaskCreationOptions.LongRunning,
-                                    TaskScheduler.Default);
+            m_deviceMonitor = Task.Run(() => MonitorDevices(m_cts.Token), m_cts.Token);
         }
 
         #endregion
@@ -74,58 +71,54 @@ namespace DeviceMonitoring.Services
         /// <exception cref="NotSupportedException">Thrown if <paramref name="deviceType"/> is not a supported device type.</exception>
         public void RegisterDevice(string deviceId, string deviceName, DeviceType deviceType, int? deviceInterval = null)
         {
-            if(string.IsNullOrEmpty(deviceId))
+            if (string.IsNullOrEmpty(deviceId))
                 throw new ArgumentNullException(nameof(deviceId), "Device ID cannot be null or empty.");
 
-            if(m_monitoringMap.ContainsKey(deviceId))
+            // Create the device based on the specified type and subscribe to its events.
+            var device = DeviceFactory.CreateDevice(deviceId, deviceName, deviceType);
+            device.DeviceStateChanged += (s, e) => DeviceMonitorStateChanged?.Invoke(s, e);
+
+            // Create a new monitoring entry for the device.
+            var entry = new DeviceEntry(device, deviceInterval ?? 1000, DateTime.Now);
+
+            // Add the device to the monitoring map. If the device ID already exists, throw an exception.
+            if (!m_monitoringMap.TryAdd(deviceId, entry))
                 throw new DeviceAlreadyExistsException($"Device with ID {deviceId} already exists.");
-
-            lock (_lock)
-            {
-                // Create the device based on the specified type and subscribe to its events.
-                var device = DeviceFactory.CreateDevice(deviceId, deviceName, deviceType);
-                device.DeviceStateChanged += (s, e) => DeviceMonitorStateChanged?.Invoke(s, e);
-                device.DeviceDataChanged += (s, e) => DeviceDataChanged?.Invoke(s, e);
-
-
-                // Create a new monitoring entry for the device.
-                var entry = new MonitoringEntryContract(device, deviceInterval ?? 1000, DateTime.MinValue);
-
-                // Add the device to the monitoring map.
-                m_monitoringMap.Add(deviceId, entry);
-            }
         }
 
         /// <summary>
-        /// Retrieves the current data for the specified device.
+        /// Deregisters a device from monitoring and unsubscribes from its state change events.
         /// </summary>
-        /// <param name="deviceId">The unique identifier of the device whose data is to be retrieved. Cannot be null or empty.</param>
-        /// <returns>A <see cref="DeviceData"/> object containing the current data of the specified device,  or <see
-        /// langword="null"/> if the device is not found.</returns>
-        public DeviceData? GetDeviceData(string deviceId)
+        /// <remarks>This method removes the specified device from the monitoring map and unsubscribes
+        /// from its  <see cref="DeviceStateChanged"/> event. If the device is not found in the monitoring map, no
+        /// action is taken.</remarks>
+        /// <param name="deviceId">The unique identifier of the device to deregister. Cannot be null or empty.</param>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="deviceId"/> is null or empty.</exception>
+        public void DeregisterDevice(string deviceId)
         {
-            lock (_lock)
-            {
+            if (string.IsNullOrEmpty(deviceId))
+                throw new ArgumentNullException(nameof(deviceId), "Device ID cannot be null or empty.");
 
-                return m_monitoringMap.TryGetValue(deviceId, out MonitoringEntryContract? entry) && entry.Device is IDevice device
-                    ? device.GetCurrentData()
-                    : null;
+            // Attempt to remove the device from the monitoring map.
+            if (!m_monitoringMap.TryRemove(deviceId, out DeviceEntry? entry))
+            {
+                Console.WriteLine($"Device with ID {deviceId} not found in monitoring map.");
+                return;
             }
+
+            // Unsubscribe from the device events.
+            entry.Device.DeviceDataChanged -= (s, e) => DeviceDataChanged?.Invoke(s, e);
+            entry.Device.DeviceStateChanged -= (s, e) => DeviceMonitorStateChanged?.Invoke(s, e);
         }
 
         /// <summary>
         /// Retrieves a device of the specified type by its unique identifier.
         /// </summary>
-        /// <remarks>If the device with the specified identifier exists but cannot be cast to the
-        /// specified type <typeparamref name="T"/>, this method will return <see langword="null"/>.</remarks>
-        /// <typeparam name="T">The type of the device to retrieve. Must be a class that implements <see cref="IDevice"/>.</typeparam>
-        /// <param name="id">The unique identifier of the device to retrieve. Cannot be <see langword="null"/> or empty.</param>
-        /// <returns>The device of type <typeparamref name="T"/> if found and successfully cast; otherwise, <see
-        /// langword="null"/>.</returns>
-        public T? GetDevice<T>(string id) where T : class, IDevice
+        public IDevice? GetDevice(string id)
         {
-            if (m_monitoringMap.TryGetValue(id, out MonitoringEntryContract? entry) &&
-                entry.Device is T device)
+            if (!string.IsNullOrEmpty(id) &&
+                m_monitoringMap.TryGetValue(id, out DeviceEntry? entry) &&
+                entry.Device is IDevice device)
             {
                 return device;
             }
@@ -142,18 +135,15 @@ namespace DeviceMonitoring.Services
         /// <returns>A task that represents the asynchronous operation. The task result contains an <see cref="IEnumerable{T}"/>
         /// of <see cref="IDevice"/> objects representing the current devices. If no devices are available, the
         /// collection will be empty.</returns>
-        public async Task<IEnumerable<IDevice>> GetAllDevices()
+        public IEnumerable<IDevice> GetAllDevices()
         {
             if (m_monitoringMap?.Values is null || !m_monitoringMap.Values.Any())
-                return Enumerable.Empty<IDevice>();
-
-            var devices = m_monitoringMap.Values
-                .Select(entry => entry.Device)
-                .Where(device => device != null)
-                .ToList();
+                return [];
 
             // Return a snapshot of the current devices
-            return await Task.FromResult(devices);
+            return m_monitoringMap.Values
+                .Select(entry => entry.Device)
+                .Where(device => device != null);
         }
 
         /// <summary>
@@ -164,17 +154,18 @@ namespace DeviceMonitoring.Services
         /// <typeparam name="T">The type of the device to monitor. Must implement <see cref="IDevice"/>.</typeparam>
         /// <param name="id">The unique identifier of the device to monitor. Must not be <see langword="null"/> or empty.</param>
         /// <returns></returns>
-        public void StartMonitoring<T>(string id) where T : class, IDevice
+        public void StartMonitoring(string id)
         {
             if (string.IsNullOrEmpty(id))
                 return;
 
             // Get the device from the monitoring map
-            var device = GetDevice<T>(id);
+            var device = GetDevice(id);
             if (device is null)
                 return;
 
-            //Update its state to Monitoring.
+            //Subscribe to DeviceDataChanged event and update device state to Monitoring.
+            device.DeviceDataChanged += (s, e) => DeviceDataChanged?.Invoke(s, e);
             device.UpdateDeviceState(DeviceMonitorState.Monitoring);
         }
 
@@ -187,17 +178,18 @@ namespace DeviceMonitoring.Services
         /// <typeparam name="T">The type of the device, which must implement <see cref="IDevice"/>.</typeparam>
         /// <param name="id">The unique identifier of the device to stop monitoring.</param>
         /// <returns></returns>
-        public void StopMonitoring<T>(string id) where T : class, IDevice
+        public void StopMonitoring(string id)
         {
             if (string.IsNullOrEmpty(id))
                 return;
 
             // Get the device from the monitoring map
-            var device = GetDevice<T>(id);
+            var device = GetDevice(id);
             if (device is null)
                 return;
 
-            //Update its state to Monitoring.
+            //Unsubscribe to DeviceDataChanged event and update device state to Stopped.
+            device.DeviceDataChanged -= (s, e) => DeviceDataChanged?.Invoke(s, e);
             device.UpdateDeviceState(DeviceMonitorState.Stopped);
         }
 
@@ -217,27 +209,35 @@ namespace DeviceMonitoring.Services
         {
             while (!token.IsCancellationRequested)
             {
-                var now = DateTime.UtcNow;
-                foreach (MonitoringEntryContract entry in m_monitoringMap.Values)
+                try
                 {
-                    var device = entry.Device;
-                    if (device is null)
-                        continue;
-
-                    if (!entry.Device.DeviceMonitorState.Equals(DeviceMonitorState.Monitoring))
-                        continue;
-
-                    // Check if the device is ready for an update.
-                    var elapsed = (now - entry.LastUpdated).TotalMilliseconds;
-                    if (elapsed >= entry.Interval)
+                    var now = DateTime.Now;
+                    foreach (DeviceEntry entry in m_monitoringMap.Values)
                     {
-                        // Perform device operation.
-                        device.PerformDeviceOperation();
+                        var device = entry.Device;
+                        if (device is null)
+                            continue;
+
+                        if (!entry.Device.DeviceMonitorState.Equals(DeviceMonitorState.Monitoring))
+                            continue;
+
+                        // Check if the device is ready for an update.
+                        var elapsed = (now - entry.LastUpdated).TotalMilliseconds;
+                        if (elapsed >= entry.Interval)
+                        {
+                            // Perform device operation.
+                            device.PerformDeviceOperation();
+                            entry.LastUpdated = now;
+                        }
                     }
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine($"Method:{nameof(MonitorDevices)}, Error:{ex}");
                 }
 
                 // Add Delay to adjust CPU load.
-                await Task.Delay(100, token);
+                await Task.Delay(10, token);
             }
         } 
 

@@ -10,7 +10,6 @@
     {
         public string DeviceId { get; }
         public object NewValue { get; }
-
         public DeviceDataChangedEventArgs(string deviceId, object newValue)
         {
             DeviceId = deviceId;

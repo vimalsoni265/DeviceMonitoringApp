@@ -4,10 +4,14 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        xmlns:usercontrols="clr-namespace:DeviceMonitoring.UI.UserControls"
-        xmlns:local="clr-namespace:DeviceMonitoring.UI"
-        mc:Ignorable="d" d:Height="1080" d:Width="1920"
-        Height="600" Width="800">
+        xmlns:usercontrols="clr-namespace:DeviceMonitoring.UI.UserControls"        
+        xmlns:converters="clr-namespace:DeviceMonitoring.UI.Converters"
+        xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+        xmlns:local="clr-namespace:DeviceMonitoring.UI"      
+        mc:Ignorable="d" 
+        d:Height="1024" d:Width="1280" 
+        d:DataContext="{d:DesignInstance Type=local:MainWindowViewModel}"
+        Height="1024" Width="1280" WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
         <Style x:Key="HeaderBorder" TargetType="Border" BasedOn="{StaticResource MaterialDesignToolBarMainPanelBorderStyle}">
@@ -16,10 +20,15 @@
             <Setter Property="CornerRadius" Value="0 15 0 0" />
             <Setter Property="Padding" Value="15" />
         </Style>
+        <!-- Ensure TimeAgoConverter is properly defined -->
+        <converters:TimeAgoConverter x:Key="TimeAgoConverter"/>
+        <converters:TemperatureToBrushConverter x:Key="TemperatureToBrushConverter"/>
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </Window.Resources>
-    <Grid >
+    
+    <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="80"></RowDefinition>
+            <RowDefinition Height="Auto"></RowDefinition>
             <RowDefinition Height="*"></RowDefinition>
             <RowDefinition Height="Auto"></RowDefinition>
         </Grid.RowDefinitions>
@@ -28,24 +37,165 @@
         <!--#endregion-->
         
         <!--#region Main Content -->
-        <usercontrols:Dashboard Grid.Row="1" Background="Gainsboro"/>
-        <!--#endregion-->
+        <Grid Grid.Row="1" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="*"></RowDefinition>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-        <!--#region Footer -->
-        <Grid Grid.Row="2">
-            <StatusBar HorizontalContentAlignment="Right">
-                <StackPanel Orientation="Horizontal" Margin="5,0" VerticalAlignment="Center">
-                    <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" />
-                    <TextBlock Text="Monitoring " Margin="5,0" />
-                    <TextBlock >
-                        <Run Text="{Binding Devices.MonitoringCount}" FontWeight="Bold" />
-                        <Run Text="/" />
-                        <Run Text="{Binding Devices.Count}" FontWeight="Bold" />
-                    </TextBlock>
+            <Border Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource MaterialDesignToolBarMainPanelBorderStyle}">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock Style="{StaticResource MaterialDesignHeadline6TextBlock}" Margin="0,0" 
+                               Text="Export Device Data" />
+                    <materialDesign:PopupBox PlacementMode="BottomAndAlignRightEdges" StaysOpen="False" HorizontalAlignment="Right">
+                        <StackPanel Margin="10">
+                            <Button Style="{StaticResource MaterialDesignFlatButton}" 
+                                    Command="{Binding DataContext.ExportToCSVCommand, RelativeSource={RelativeSource AncestorType=Window}}" >
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="CSV" VerticalAlignment="Center"/>
+                                    <materialDesign:PackIcon Kind="FileCsvOutline" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Separator />
+                            <Button Style="{StaticResource MaterialDesignFlatButton}" 
+                                    Command="{Binding DataContext.ExportToJsonCommand, RelativeSource={RelativeSource AncestorType=Window}}" >
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Json" VerticalAlignment="Center"/>
+                                    <materialDesign:PackIcon Kind="CodeJson" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </materialDesign:PopupBox>
                 </StackPanel>
-                
-            </StatusBar>
+            </Border>
+            <Border Grid.Row="1" Grid.Column="0" BorderBrush="{StaticResource SecondaryHueMidBrush}" BorderThickness="0.5">
+                <ListBox  Grid.Row="0" ItemsSource="{Binding Devices}" 
+                                  VirtualizingStackPanel.IsVirtualizing="True" 
+                                  VirtualizingStackPanel.VirtualizationMode="Recycling" 
+                                  VirtualizingPanel.ScrollUnit="Item" 
+                                  ScrollViewer.CanContentScroll="True">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VirtualizingStackPanel Orientation="Vertical" Margin="10 0"/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <materialDesign:Card BorderThickness="0 1.8 0 0" BorderBrush="{StaticResource MaterialDesignShadowBrush}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid Grid.Column="1">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <DockPanel LastChildFill="True" Margin="0 10">
+                                            <TextBlock Margin="10" Style="{StaticResource MaterialDesignHeadline5TextBlock}" Text="{Binding Device.Name}" DockPanel.Dock="Top" />
+                                            <TextBlock Grid.Row="2" Style="{StaticResource MaterialDesignTextBlock}" Foreground="{DynamicResource MaterialDesign.Brush.ForegroundLight}"
+                                                       Text="{Binding Device.Id, StringFormat=Device Id: {0}}" ToolTip="{Binding Device.Id}" 
+                                                       DockPanel.Dock="Bottom" Margin="10 -15 0 0" Width="250"
+                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" TextAlignment="Left" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                                        </DockPanel>
+                                        <DockPanel Grid.Row="1" Margin="5 10">
+                                            <materialDesign:PackIcon Width="40" Height="40" DockPanel.Dock="Left" 
+                                                                     Kind="Temperature" Opacity="0.3" />
+                                            <TextBlock HorizontalAlignment="Right" Margin="0 -20 0 0 " DockPanel.Dock="Right" Text="{Binding CurrentValue}" 
+                                                       Foreground="{Binding CurrentValue, Converter={StaticResource TemperatureToBrushConverter}}" 
+                                                       Style="{StaticResource MaterialDesignHeadline2TextBlock}"/>
+                                            <materialDesign:PackIcon Width="40" Height="40" DockPanel.Dock="Right" 
+                                                                     Kind="TemperatureCelsius" Opacity="0.3"/>
+                                        </DockPanel>
+                                        <DockPanel Grid.Row="2" Margin="0 -20 10 0">
+                                            <TextBlock DockPanel.Dock="Right" Style="{StaticResource MaterialDesignTextBlock}" Foreground="{DynamicResource MaterialDesign.Brush.ForegroundLight}" 
+                                                       HorizontalAlignment="Center" VerticalAlignment="Top">
+                                                <TextBlock.Text>
+                                                    <MultiBinding Converter="{StaticResource TimeAgoConverter}">
+                                                        <Binding Path="LastUpdated"/>
+                                                        <Binding Path="Now" Source="{x:Static converters:TimeProvider.Instance}"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                            <TextBlock DockPanel.Dock="Right" Style="{StaticResource MaterialDesignTextBlock}" Foreground="{DynamicResource MaterialDesign.Brush.ForegroundLight}" 
+                                                       HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                       Text="{Binding DeviceMonitorState, StringFormat=State: {0}}">
+                                            </TextBlock>
+                                        </DockPanel>
+                                    </Grid>
+                                    <Border Grid.Row="1" Grid.ColumnSpan="2" BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}" BorderThickness="0,1,0,0">
+                                        <DockPanel Margin="8" HorizontalAlignment="Right">
+                                            <Button ToolTip="Start Monitoring" Style="{StaticResource MaterialDesignOutlinedDarkButton}" 
+                                                        DockPanel.Dock="Right" Width="80" Margin="5 0" 
+                                                        Command="{Binding DataContext.StartDeviceMonitoringCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                        CommandParameter="{Binding Device.Id}">
+                                                <materialDesign:PackIcon Kind="Play" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+                                            <Button ToolTip="Stop Monitoring" Style="{StaticResource MaterialDesignOutlinedButton}" 
+                                                        DockPanel.Dock="Right" Width="80" Margin="0 0"
+                                                        Command="{Binding DataContext.StopDeviceMonitoringCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                        CommandParameter="{Binding Device.Id}">
+                                                <materialDesign:PackIcon Kind="Stop" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+                                            <Button ToolTip="View Live Graph" Style="{StaticResource MaterialDesignOutlinedButton}" 
+                                                    DockPanel.Dock="Right" Width="80" Margin="5 0"
+                                                    Command="{Binding DataContext.ViewLiveGraphCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                    CommandParameter="{Binding Device.Id}">
+                                                <materialDesign:PackIcon Kind="Eye" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+                            </materialDesign:Card>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+            <GroupBox Grid.Row="1" Grid.Column="1" Header="Device Live Chart" Style="{StaticResource MaterialDesignGroupBox}" 
+                      materialDesign:ColorZoneAssist.Mode="Light" Margin="25"
+                      BorderThickness="0.5"
+                      Visibility="{Binding LiveGraph.IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <GroupBox.HeaderTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <materialDesign:PackIcon Width="32" Height="32" VerticalAlignment="Center" Kind="ChartBar" Margin="5 0"/>
+                            <TextBlock 
+                                Text="{Binding LiveGraph.ChartTitle, RelativeSource={RelativeSource AncestorType=Window}}" Grid.Column="1" 
+                                Style="{StaticResource MaterialDesignSubtitle2TextBlock}" VerticalAlignment="Center"/>
+                            <Button Grid.Column="2" ToolTip="Close Live Graph" Style="{StaticResource MaterialDesignIconButton}" Margin="5 0" 
+                                        Command="{Binding DataContext.HideLiveGraphCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                    HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="Close" />
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </GroupBox.HeaderTemplate>
+                <lvc:CartesianChart Grid.Row="1" Padding="10" 
+                                    Series="{Binding LiveGraph.Series}" XAxes="{Binding LiveGraph.XAxes}" 
+                                    SyncContext="{Binding LiveGraph.Sync}" />
+            </GroupBox>
+        </Grid>
+
+        <Grid Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" 
+              Background="#80000000" Panel.ZIndex="1000">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="20"/>
+                <TextBlock Text="Registering devices, please wait..." Foreground="White" Margin="0,10,0,0" HorizontalAlignment="Center"/>
+            </StackPanel>
         </Grid>
         <!--#endregion-->
+
+        <materialDesign:Snackbar Grid.Row="2" x:Name="MainSnackbar" MessageQueue="{materialDesign:MessageQueue}" />
     </Grid>
 </Window>

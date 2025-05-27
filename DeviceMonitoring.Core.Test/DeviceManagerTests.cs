@@ -15,6 +15,15 @@ namespace DeviceMonitoring.Core.Test
             m_deviceMonitoringService = DeviceMonitoringService.Instance;
         }
 
+        [TearDown]
+        public void CleanupAfterEachTest()
+        {
+            foreach (var device in m_deviceMonitoringService.GetAllDevices())
+            {
+                m_deviceMonitoringService.DeregisterDevice(device.Id);
+            }
+        }
+
         [Test]
         public void Constructor_InitializesDeviceManager()
         {
@@ -55,9 +64,9 @@ namespace DeviceMonitoring.Core.Test
         {
             // Act
             m_deviceMonitoringService.RegisterDevice(deviceId, deviceName, DeviceType.TemperatureSensor);
-            var getDevice = m_deviceMonitoringService.GetDevice<TemperatureControlDevice>(deviceId);
+            var getDevice = m_deviceMonitoringService.GetDevice(deviceId);
 
-            // Assert
+            // Assert            
             Assert.That(getDevice, Is.Not.Null, $"{deviceName} is not found in the device list.");
             Assert.That(getDevice.Id, Is.EqualTo(deviceId), $"{deviceName} ID does not match.");
         }
@@ -70,7 +79,7 @@ namespace DeviceMonitoring.Core.Test
             m_deviceMonitoringService.RegisterDevice(deviceId, "TestDevice1", DeviceType.TemperatureSensor);
 
             // Act
-            var retrievedDevice = m_deviceMonitoringService.GetDevice<TemperatureControlDevice>(deviceId);
+            var retrievedDevice = m_deviceMonitoringService.GetDevice(deviceId);
 
             // Assert
             Assert.That(retrievedDevice, Is.Not.Null, "The retrieved device is null.");
@@ -96,8 +105,8 @@ namespace DeviceMonitoring.Core.Test
             m_deviceMonitoringService.RegisterDevice(deviceId, deviceName, type);
 
             // Act
-            m_deviceMonitoringService.StartMonitoring<TemperatureControlDevice>(deviceId);
-            var device = m_deviceMonitoringService.GetDevice<TemperatureControlDevice>(deviceId);
+            m_deviceMonitoringService.StartMonitoring(deviceId);
+            var device = m_deviceMonitoringService.GetDevice(deviceId);
 
             Assert.Multiple(() =>
             {
@@ -126,9 +135,9 @@ namespace DeviceMonitoring.Core.Test
 
             // Act
             m_deviceMonitoringService.RegisterDevice(deviceId, "Test Device", DeviceType.TemperatureSensor);
-            m_deviceMonitoringService.StartMonitoring<IDevice>(deviceId);
+            m_deviceMonitoringService.StartMonitoring(deviceId);
             Thread.Sleep(1000);
-            m_deviceMonitoringService.StopMonitoring<IDevice>(deviceId);
+            m_deviceMonitoringService.StopMonitoring(deviceId);
 
             Assert.Multiple(() =>
             {
@@ -155,10 +164,10 @@ namespace DeviceMonitoring.Core.Test
                 eventState = args.NewState;
             };
 
-            var device = m_deviceMonitoringService.GetDevice<TemperatureControlDevice>(deviceId);
+            var device = m_deviceMonitoringService.GetDevice(deviceId);
 
             // Act
-            m_deviceMonitoringService.StopMonitoring<TemperatureControlDevice>(deviceId);
+            m_deviceMonitoringService.StopMonitoring(deviceId);
 
             Assert.Multiple(() =>
             {
@@ -180,7 +189,7 @@ namespace DeviceMonitoring.Core.Test
             m_deviceMonitoringService.DeviceMonitorStateChanged += (_, args) => eventId = args.DeviceId;
 
             // Act
-            m_deviceMonitoringService.StopMonitoring<TemperatureControlDevice>("devId007");
+            m_deviceMonitoringService.StopMonitoring("devId007");
 
             // Assert
             Assert.That(eventId, Is.EqualTo("devId007"));
@@ -194,8 +203,8 @@ namespace DeviceMonitoring.Core.Test
             m_deviceMonitoringService.DeviceMonitorStateChanged += (_, _) => eventRaised = true;
 
             // Act
-            m_deviceMonitoringService.StopMonitoring<IDevice>(null!);
-            m_deviceMonitoringService.StopMonitoring<IDevice>(string.Empty);
+            m_deviceMonitoringService.StopMonitoring(null!);
+            m_deviceMonitoringService.StopMonitoring(string.Empty);
 
             // Assert
             Assert.That(eventRaised, Is.False, $"MonitoringStatusChanged should not throw exception and should not raise any event" );

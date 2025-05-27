@@ -1,4 +1,5 @@
-﻿namespace DeviceMonitoring.Core.Devices
+﻿
+namespace DeviceMonitoring.Core.Devices
 {
     /// <summary>
     /// Represents a temperature control device capable of monitoring and reporting temperature readings.
@@ -18,20 +19,18 @@
         #region Private Members
 
         private readonly Random m_randTemp = new();
-        
+
+        private double m_CurrentTemperature;
+
         #endregion
 
         #region Properties
 
         /// <summary>
-        /// Gets or sets the current temperature reading from the device.
+        /// Gets the current temperature value as a formatted string.
         /// </summary>
-        public double CurrentTemperature { get; private set; }
-
-        /// <summary>
-        /// Gets or sets the previous temperature reading from the device.
-        /// </summary>
-        public double PreviousTemperature { get; private set; }
+        public string CurrentValue => m_CurrentTemperature.ToString("F2");
+        
         /// <summary>
         /// Gets or sets the unique identifier for the device.
         /// </summary>
@@ -81,25 +80,21 @@
             if (DeviceMonitorState != DeviceMonitorState.Monitoring)
                 return;
 
-            // Generate a new random temperature value
-            var newTemp = m_randTemp.NextDouble() * 100.0001;
-
             // Update the current temperature and record the time of the update
-            PreviousTemperature = CurrentTemperature;
-            CurrentTemperature = newTemp;
+            m_CurrentTemperature = GetNewTemperatureFromDevice();
 
             // Invoke the DataChanged event to notify subscribers of the temperature change
-            DeviceDataChanged?.Invoke(this, new DeviceDataChangedEventArgs(Id, CurrentTemperature));
+            DeviceDataChanged?.Invoke(this, new DeviceDataChangedEventArgs(Id, m_CurrentTemperature));  
         }
 
         /// <summary>
-        /// Retrieves the current data for the device, including its identifier, data type, and current value.
+        /// Retrieves a new temperature reading from the device.
         /// </summary>
-        /// <returns>A <see cref="DeviceData"/> object containing the device's identifier, the data type ("Temperature"),  and
-        /// the current temperature value.</returns>
-        public DeviceData GetCurrentData()
+        /// <returns>A string representation of the temperature value retrieved from the device.</returns>
+        private double GetNewTemperatureFromDevice()
         {
-            return new(Id, "Temperature", CurrentTemperature);
+            // Simulate in this case for now.
+            return m_randTemp.NextDouble() * 100.01;
         }
 
         /// <summary>

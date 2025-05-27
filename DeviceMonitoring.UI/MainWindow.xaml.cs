@@ -1,13 +1,6 @@
-﻿using System.Text;
+﻿using DeviceMonitoring.UI.Models;
+using Microsoft.Extensions.DependencyInjection;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace DeviceMonitoring.UI
 {
@@ -16,9 +9,30 @@ namespace DeviceMonitoring.UI
     /// </summary>
     public partial class MainWindow : Window
     {
+        private MainWindowViewModel m_viewModel;
         public MainWindow()
         {
             InitializeComponent();
+
+            var notificationService = App.ServiceProvider.GetRequiredService<INotificationManger>();
+            if (notificationService is NotificationManger manager)
+            {
+                manager.SetSnackbar(MainSnackbar);
+            }
+
+            // DI container to manage all dependencies and their lifetimes.
+            m_viewModel = App.ServiceProvider.GetRequiredService<MainWindowViewModel>();
+            DataContext = m_viewModel;
+
+            Loaded += MainWindow_Loaded;
+        }
+
+        /// <summary>
+        /// Handles the <see cref="FrameworkElement.Loaded"/> event for the main window.
+        /// </summary>
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            await m_viewModel.RegisterAndLoadDevicesAsync();
         }
     }
 }

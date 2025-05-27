@@ -20,32 +20,30 @@
             <ColumnDefinition Width="Auto"></ColumnDefinition>
             <ColumnDefinition Width="*"></ColumnDefinition>
         </Grid.ColumnDefinitions>
+        
         <!--Right Side Design-->
         <Border Grid.Column="1" BorderBrush="{StaticResource SecondaryHueMidBrush}" BorderThickness="0 8 0 0 " VerticalAlignment="Bottom" 
-            Background="{StaticResource PrimaryHueMidBrush}">
-            <Grid Margin="0 8">
+             Background="{StaticResource PrimaryHueMidBrush}" >
+            <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="20"></ColumnDefinition>
+                    <ColumnDefinition Width="25"></ColumnDefinition>
                     <ColumnDefinition Width="Auto"></ColumnDefinition>
                     <ColumnDefinition Width="*"></ColumnDefinition>
                 </Grid.ColumnDefinitions>
-
+                
                 <TextBlock Style="{StaticResource MaterialDesignHeadline6TextBlock}" Foreground="{DynamicResource SecondaryTextForeGround}" 
-                       VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="1" Margin="10,0" Text="Dashboard" />
-
-                <!-- Controls 
-                    IsEnabled="{Binding DataContext.ControlsEnabled, RelativeSource={RelativeSource FindAncestor, AncestorType=Window}}" 
-                -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Grid.Column="2">
-                    <Button  Style="{StaticResource MaterialDesignFlatLightButton}" ToolTip="LogOut" Command="{Binding LogoutCommand}">
+                           VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="1" Margin="5,0" Text="Dashboard" />
+                <!-- Controls -->
+                <!--<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Grid.Column="2">
+                    <Button  Style="{StaticResource MaterialDesignFlatButton}" ToolTip="LogOut">
                         <materialDesign:PackIcon Kind="Power" Width="20" Height="20" />
                     </Button>
-                </StackPanel>
+                </StackPanel>-->
             </Grid>
         </Border>
-
+        
         <!-- Left Title-->
-        <Grid>
+        <Grid Height="65">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"></ColumnDefinition>
                 <ColumnDefinition Width="*"></ColumnDefinition>

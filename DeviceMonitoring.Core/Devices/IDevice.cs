@@ -24,20 +24,15 @@
         /// </summary>
         DeviceType Type { get; set; }
 
+        /// <summary>
+        /// Gets or sets the current value associated with this instance.
+        /// </summary>
+        string CurrentValue { get; }
 
         /// <summary>
         /// Gets or sets the current state of the device monitor.
         /// </summary>
         DeviceMonitorState DeviceMonitorState { get; set; }
-
-        /// <summary>
-        /// Retrieves the current data associated with the device.
-        /// </summary>
-        /// <remarks>The returned <see cref="DeviceData"/> object reflects the most recent data available
-        /// for the device. Callers should ensure they handle cases where the data might be stale or incomplete,
-        /// depending on the device's state or connectivity.</remarks>
-        /// <returns>A <see cref="DeviceData"/> object containing the current state and information of the device.</returns>
-        DeviceData GetCurrentData();
 
         /// <summary>
         /// Performs an operation on the monitoring device.
