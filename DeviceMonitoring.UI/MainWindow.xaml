@@ -10,7 +10,6 @@
         xmlns:local="clr-namespace:DeviceMonitoring.UI"      
         mc:Ignorable="d" 
         d:Height="1024" d:Width="1280" 
-        d:DataContext="{d:DesignInstance Type=local:MainWindowViewModel}"
         Height="1024" Width="1280" WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
@@ -24,6 +23,7 @@
         <converters:TimeAgoConverter x:Key="TimeAgoConverter"/>
         <converters:TemperatureToBrushConverter x:Key="TemperatureToBrushConverter"/>
         <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <converters:StatusToBrushConverter x:Key="StatusToBrushConverter" />
     </Window.Resources>
     
     <Grid>
@@ -80,10 +80,10 @@
                                   ScrollViewer.CanContentScroll="True">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <VirtualizingStackPanel Orientation="Vertical" Margin="10 0"/>
+                            <VirtualizingStackPanel Orientation="Vertical" Margin="5 0"/>
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
-                    <ListBox.ItemTemplate>
+                    <!--<ListBox.ItemTemplate>
                         <DataTemplate>
                             <materialDesign:Card BorderThickness="0 1.8 0 0" BorderBrush="{StaticResource MaterialDesignShadowBrush}">
                                 <Grid>
@@ -154,6 +154,77 @@
                                 </Grid>
                             </materialDesign:Card>
                         </DataTemplate>
+                    </ListBox.ItemTemplate>-->
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{StaticResource SecondaryHueMidBrush}" BorderThickness="0,0,0,1" Padding="10">
+                                <Grid Margin="5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition />
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <!-- Status Icon or Color -->
+                                    <Ellipse Grid.RowSpan="2" Width="16" Height="16" Fill="{Binding DeviceMonitorState, Converter={StaticResource StatusToBrushConverter}}" VerticalAlignment="Top"/>
+                                    <!-- Device Info -->
+                                    <StackPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Device.Name}" FontWeight="Bold"/>
+                                        <TextBlock Text="{Binding Device.Id}" FontSize="10" Foreground="Gray"/>                                        
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" Grid.Row="2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Margin="5 0" Text="{Binding CurrentValue}" 
+                                                   Foreground="{Binding CurrentValue, Converter={StaticResource TemperatureToBrushConverter}}" FontSize="36" FontWeight="Light"/>
+                                        
+                                        <TextBlock Grid.Column="1" Foreground="Gray" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5 0">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{StaticResource TimeAgoConverter}">
+                                                    <Binding Path="LastUpdated"/>
+                                                    <Binding Path="Now" Source="{x:Static converters:TimeProvider.Instance}"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </Grid>
+                                    <!-- Actions (optional: use a Menu or ContextMenu for more actions) -->
+                                    <materialDesign:PopupBox Grid.Column="2" Grid.RowSpan="2" PlacementMode="BottomAndAlignRightEdges" StaysOpen="False" VerticalAlignment="Top">
+                                        <StackPanel Margin="5">
+                                            <Button Style="{StaticResource MaterialDesignFlatButton}" 
+                                                    Command="{Binding DataContext.StartDeviceMonitoringCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                    CommandParameter="{Binding Device.Id}" Content="Start Monitoring">
+                                                <!--<StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="Start Monitoring" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="Play" VerticalAlignment="Center" />
+                                                </StackPanel>-->
+                                            </Button>
+                                            <Button Style="{StaticResource MaterialDesignFlatButton}" 
+                                                    Command="{Binding DataContext.StopDeviceMonitoringCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                    CommandParameter="{Binding Device.Id}" Content="Stop Monitoring">
+                                                <!--<StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="Stop Monitoring" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="Stop" VerticalAlignment="Center" />
+                                                </StackPanel>-->
+                                            </Button>
+                                            <Separator/>
+                                            <Button Style="{StaticResource MaterialDesignFlatButton}" 
+                                                    Command="{Binding DataContext.ViewLiveGraphCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                    CommandParameter="{Binding Device.Id}" Content="View Live Graph">
+                                                <!--<StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="View Live Graph" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="Eye" VerticalAlignment="Center" />
+                                                </StackPanel>-->
+                                            </Button>                                            
+                                        </StackPanel>
+                                    </materialDesign:PopupBox>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
             </Border>
@@ -187,11 +258,13 @@
             </GroupBox>
         </Grid>
 
-        <Grid Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" 
-              Background="#80000000" Panel.ZIndex="1000">
+        <Grid Grid.Row="1" Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" 
+              Background="#80000000" Panel.ZIndex="100" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">            
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <ProgressBar IsIndeterminate="True" Width="200" Height="20"/>
-                <TextBlock Text="Registering devices, please wait..." Foreground="White" Margin="0,10,0,0" HorizontalAlignment="Center"/>
+                <materialDesign:Card Padding="4" UniformCornerRadius="4">
+                    <ProgressBar IsIndeterminate="True" Style="{StaticResource MaterialDesignCircularProgressBar}" Width="80" Height="80" Value="35"/>
+                </materialDesign:Card>
+                <TextBlock Text="Processing, Please wait..." Foreground="White" Margin="0,10,0,0" HorizontalAlignment="Center"/>
             </StackPanel>
         </Grid>
         <!--#endregion-->
