@@ -96,3 +96,7 @@ Console.WriteLine($"Device {deviceId} deregistered.");
 ```
 ### 9. Dispose the Service (Application Shutdown)
 Ensure you dispose of the service when your application is shutting down to release resources and stop background tasks gracefully.
+
+![image](https://github.com/user-attachments/assets/ee679ebf-2a2d-4e68-b4c8-14243fbc4c62)
+![image](https://github.com/user-attachments/assets/c152a26d-64a9-4860-9cf5-d8400168ade0)
+
