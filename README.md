@@ -31,8 +31,7 @@ This project is built using C# 12 and targets .NET 8.
 *   **Event-Driven Notifications**:
     *   `DeviceMonitoringService.DeviceDataChanged`: Raised when a monitored device's data is updated.
     *   `DeviceMonitoringService.DeviceMonitorStateChanged`: Raised when a device's state (e.g., started, stopped) or its internal monitor state changes.
-*   **Scalable Monitoring Loop**: Utilizes a `SortedSet` based scheduler to efficiently manage and poll a large number of devices (10K+) without iterating through the entire collection on each tick.
-*   **Singleton Service**: Ensures a single instance of `DeviceMonitoringService` throughout the application.
+*   *   **Singleton Service**: Ensures a single instance of `DeviceMonitoringService` throughout the application.
 *   **Resource Management**: Implements `IDisposable` for proper cleanup of resources, including cancellation of monitoring tasks and disposal of device entries.
 
 ## Getting Started
