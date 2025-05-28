@@ -1,9 +1,5 @@
 ﻿using MaterialDesignThemes.Wpf;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Windows.Threading;
 
 namespace DeviceMonitoring.UI.Models
 {
@@ -26,6 +22,13 @@ namespace DeviceMonitoring.UI.Models
 
         public void ShowMessage(string message, int durationMilliseconds = 2000)
         {
+            // If not on the UI thread, invoke the method on the UI thread
+            if (!Dispatcher.CurrentDispatcher.CheckAccess())
+            {
+                Dispatcher.CurrentDispatcher.Invoke(() => ShowMessage(message, durationMilliseconds));
+                return;
+            }
+
             _snackbar?.MessageQueue?.Enqueue(message, null, null, null, false, true, TimeSpan.FromMilliseconds(durationMilliseconds));
         }
     }

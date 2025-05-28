@@ -1,20 +1,99 @@
-# Introduction 
-TODO: Give a short introduction of your project. Let this section explain the objectives or the motivation behind this project. 
+# DeviceMonitoring Project
 
-# Getting Started
-TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
-1.	Installation process
-2.	Software dependencies
-3.	Latest releases
-4.	API references
+## Overview
 
-# Build and Test
-TODO: Describe and show how to build your code and run the tests. 
+The DeviceMonitoring project provides a robust and scalable service for managing and monitoring a collection of devices in a .NET environment. 
+It allows for device registration, data polling at configurable intervals, and event-driven notifications for device state and data changes. 
+The system is designed with scalability in mind, capable of efficiently handling a large number of devices.
 
-# Contribute
-TODO: Explain how other users and developers can contribute to make your code better. 
+This project is built using C# 12 and targets .NET 8.
 
-If you want to learn more about creating good readme files then refer the following [guidelines](https://docs.microsoft.com/en-us/azure/devops/repos/git/create-a-readme?view=azure-devops). You can also seek inspiration from the below readme files:
-- [ASP.NET Core](https://github.com/aspnet/Home)
-- [Visual Studio Code](https://github.com/Microsoft/vscode)
-- [Chakra Core](https://github.com/Microsoft/ChakraCore)
+## Core Components
+
+*   **`DeviceMonitoringService`**: A singleton service that acts as the central hub for device management. It handles device registration, deregistration, starting/stopping monitoring, and orchestrates the device polling loop.
+*   **`IDevice`**: An interface defining the contract for all devices managed by the service. It includes properties for device identification (ID, Name, Type), state, current value, and methods for performing device-specific operations and updating its state.
+*   **`DeviceEntry`**: An internal class used by `DeviceMonitoringService` to manage the monitoring schedule and state for each registered device, including its polling interval, last update time, and next due time for an operation.
+*   **`DeviceFactory`**: (Assumed, as `DeviceFactory.CreateDevice` is used) A factory responsible for creating instances of `IDevice` implementations.
+*   **Device Implementations (e.g., `TemperatureControlDevice`)**: Concrete classes that implement `IDevice` for specific types of devices, providing logic for `PerformDeviceOperation`.
+*   **Enums**:
+    *   `DeviceType`: Categorizes devices (e.g., `TemperatureSensor`).
+    *   `DeviceMonitorState`: Represents the operational state of a device (e.g., `Idle`, `Monitoring`, `Stopped`).
+*   **Event Arguments**:
+    *   `DeviceDataChangedEventArgs`: Carries data when a device's value changes.
+    *   `DeviceMonitorStateChangedEventArgs`: Carries data when a device's monitoring state changes.
+
+## Features
+
+*   **Device Management**: Register new devices and deregister existing ones.
+*   **Flexible Monitoring**: Start and stop monitoring for individual devices.
+*   **Configurable Polling**: Specify custom polling intervals for each device.
+*   **Asynchronous Operations**: Device operations (`PerformDeviceOperation`) are asynchronous, preventing the monitoring loop from blocking.
+*   **Event-Driven Notifications**:
+    *   `DeviceMonitoringService.DeviceDataChanged`: Raised when a monitored device's data is updated.
+    *   `DeviceMonitoringService.DeviceMonitorStateChanged`: Raised when a device's state (e.g., started, stopped) or its internal monitor state changes.
+*   **Scalable Monitoring Loop**: Utilizes a `SortedSet` based scheduler to efficiently manage and poll a large number of devices (10K+) without iterating through the entire collection on each tick.
+*   **Singleton Service**: Ensures a single instance of `DeviceMonitoringService` throughout the application.
+*   **Resource Management**: Implements `IDisposable` for proper cleanup of resources, including cancellation of monitoring tasks and disposal of device entries.
+
+## Getting Started
+
+### Prerequisites
+
+*   .NET 8 SDK
+
+### Installation
+
+1.  Clone the repository (if applicable).
+2.  Include the DeviceMonitoring project (e.g., `DeviceMonitoring.Core.csproj`, `DeviceMonitoring.Services.csproj`) in your solution.
+
+## How to Use
+
+Below are examples of how to interact with the `DeviceMonitoringService`.
+
+### 1. Get the Service Instance
+
+The `DeviceMonitoringService` is a singleton. Access it via its `Instance` property:
+### 2. Register a New Device
+```csharp
+string deviceId = "temp-sensor-01"; string deviceName = "Living Room Temperature Sensor"; 
+DeviceType deviceType = DeviceType.TemperatureSensor; 
+int pollingIntervalMs = 5000; // Poll every 5 seconds
+try
+{ 
+    service.RegisterDevice(deviceId, deviceName, deviceType, pollingIntervalMs); 
+    Console.WriteLine($"Device {deviceId} registered."); 
+}
+catch (DeviceAlreadyExistsException ex) 
+{ 
+    Console.WriteLine(ex.Message); 
+} 
+catch (NotSupportedException ex) 
+{ 
+    Console.WriteLine($"Error registering device: {ex.Message}"); 
+}
+```
+
+### 3. Subscribe to Events
+```csharp
+// Subscribe to data changes service.DeviceDataChanged += (sender, args) => { Console.WriteLine($"DataChanged: DeviceId={args.DeviceId}, NewValue={args.NewValue}"); };
+// Subscribe to state changes service.DeviceMonitorStateChanged += (sender, args) => { Console.WriteLine($"StateChanged: DeviceId={args.DeviceId}, NewState={args.NewState}"); };
+```
+### 4. Start Monitoring a Device
+```csharp
+service.StartMonitoring(deviceId); 
+Console.WriteLine($"Monitoring started for device {deviceId}.");
+```
+
+### 5. Stop Monitoring a Device
+```csharp
+service.StopMonitoring(deviceId); 
+Console.WriteLine($"Monitoring stopped for device {deviceId}.");
+```
+
+### 6. Deregister a Device
+```csharp
+service.DeregisterDevice(deviceId); 
+Console.WriteLine($"Device {deviceId} deregistered.");
+```
+### 9. Dispose the Service (Application Shutdown)
+Ensure you dispose of the service when your application is shutting down to release resources and stop background tasks gracefully.

@@ -3,6 +3,7 @@ using LiveChartsCore;
 using LiveChartsCore.Defaults;
 using LiveChartsCore.SkiaSharpView;
 using System.Collections.ObjectModel;
+using System.Windows.Threading;
 
 namespace DeviceMonitoring.UI.Models
 {
@@ -104,6 +105,13 @@ namespace DeviceMonitoring.UI.Models
         /// </summary>
         public void AddDataPoint(object newValue)
         {
+            // Ensure UI thread for collection modifications
+            if (!Dispatcher.CurrentDispatcher.CheckAccess())
+            {
+                Dispatcher.CurrentDispatcher.Invoke(() => AddDataPoint(newValue));
+                return;
+            }
+
             if (!double.TryParse(newValue.ToString(), out double parsedValue))
                 return;
 

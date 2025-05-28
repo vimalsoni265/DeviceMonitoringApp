@@ -25,7 +25,13 @@ namespace DeviceMonitoring.UI
             DataContext = m_viewModel;
 
             Loaded += MainWindow_Loaded;
+            Closed += MainWindow_Closed;
         }
+
+        /// <summary>
+        /// Handles the <see cref="System.Windows.Window.Closed"/> event for the main window.
+        /// </summary>
+        private void MainWindow_Closed(object? sender, EventArgs e) => m_viewModel?.Dispose();
 
         /// <summary>
         /// Handles the <see cref="FrameworkElement.Loaded"/> event for the main window.

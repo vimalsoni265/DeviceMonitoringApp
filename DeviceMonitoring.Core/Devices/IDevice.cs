@@ -39,7 +39,7 @@
         /// </summary>
         /// <remarks>This method executes a predefined operation on the currently connected device. 
         /// Ensure that a device is properly connected and initialized before calling this method.</remarks>
-        void PerformDeviceOperation();
+        Task PerformDeviceOperation();
 
         /// <summary>
         /// Updates the current state of the device monitor.

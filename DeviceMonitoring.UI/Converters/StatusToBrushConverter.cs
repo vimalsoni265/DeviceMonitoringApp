@@ -6,18 +6,32 @@ namespace DeviceMonitoring.UI.Converters
 {
     public class StatusToBrushConverter : IValueConverter
     {
-        public Brush MonitoringBrush { get; set; } = Brushes.Green;
-        public Brush StoppedBrush { get; set; } = Brushes.Red;
-        public Brush DefaultBrush { get; set; } = Brushes.Gray;
+        // Static readonly frozen brushes for thread safety and performance
+        private static readonly Brush m_monitoringBrush;
+        private static readonly Brush m_stoppedBrush;
+        private static readonly Brush m_defaultBrush;
+
+        static StatusToBrushConverter()
+        {
+            // Initialize brushes
+            m_monitoringBrush = Brushes.Green.Clone();
+            m_stoppedBrush = Brushes.Red.Clone();
+            m_defaultBrush = Brushes.Gray.Clone();
+
+            // Freeze brushes for thread safety and performance
+            m_monitoringBrush.Freeze();
+            m_stoppedBrush.Freeze();
+            m_defaultBrush.Freeze();
+        }
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var status = value as string;
             return status switch
             {
-                "Monitoring" => MonitoringBrush,
-                "Stopped" => StoppedBrush,
-                _ => DefaultBrush
+                "Monitoring" => m_monitoringBrush,
+                "Stopped" => m_stoppedBrush,
+                _ => m_defaultBrush
             };
         }
 

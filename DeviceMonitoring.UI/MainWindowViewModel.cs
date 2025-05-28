@@ -1,19 +1,17 @@
 ﻿using DeviceMonitoring.Core.Devices;
 using DeviceMonitoring.Services;
 using DeviceMonitoring.UI.Models;
-using LiveChartsCore;
-using LiveChartsCore.Defaults;
-using LiveChartsCore.SkiaSharpView;
 using Microsoft.Extensions.Configuration;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace DeviceMonitoring.UI
 {
     /// <summary>
     /// Represents the view model for the main window of the application, providing data binding and interaction logic.
     /// </summary>
-    public class MainWindowViewModel : ViewModelBase
+    public class MainWindowViewModel : ViewModelBase, IDisposable
     {
         #region Private Members
         private DeviceMonitoringService m_deviceMonitoringServiceInstance;
@@ -21,6 +19,8 @@ namespace DeviceMonitoring.UI
         private readonly INotificationManger m_notificationManger;
         private readonly IConfiguration m_configuration;
         private ObservableCollection<DeviceModel> m_devices = [];
+        private Dictionary<string, DeviceModel> m_deviceMap = new();
+        private bool _isDisposed;
         #endregion
 
         #region Properties
@@ -83,8 +83,8 @@ namespace DeviceMonitoring.UI
         /// <summary>
         /// Constructor
         /// </summary>
-        public MainWindowViewModel(DeviceMonitoringService deviceMonitoringService, 
-            IExportService exportService, 
+        public MainWindowViewModel(DeviceMonitoringService deviceMonitoringService,
+            IExportService exportService,
             INotificationManger notificationManger,
             IConfiguration configuration)
         {
@@ -101,19 +101,39 @@ namespace DeviceMonitoring.UI
             ViewLiveGraphCommand = new DelegateCommand<string?>(ExecuteViewLiveGraphCommand, CanExecuteViewLiveGraphCommand);
             HideLiveGraphCommand = new DelegateCommand<string?>(ExecuteHideLiveGraphCommand, CanExecuteHideLiveGraphCommand);
             ExportToCSVCommand = new AsyncDelegateCommand(ExecuteExportDeviceDataCommand, CanExecuteExportDeviceDataCommand);
-            ExportToJsonCommand= new AsyncDelegateCommand(ExecuteExportDeviceDataCommand, CanExecuteExportDeviceDataCommand);
+            ExportToJsonCommand = new AsyncDelegateCommand(ExecuteExportDeviceDataCommand, CanExecuteExportDeviceDataCommand);
         }
         #endregion
 
         #region Private Methods
 
+        /// <summary>
+        /// Caches all command properties of the current instance for efficient re-evaluation.
+        /// </summary>
+        /// <remarks>This method identifies all properties of the current instance that are of type <see
+        /// cref="DelegateCommandBase"/> or its derived types, retrieves their values, and stores them in an internal
+        /// cache. This allows for optimized access to commands without repeatedly reflecting over the
+        /// properties.</remarks>
+        private void CachedCommands(ref List<DelegateCommandBase> cachedCommands)
+        {
+            // Cache commands for efficient re-evaluation           
+            var commandProperties = this.GetType().GetProperties()
+                                          .Where(prop => typeof(DelegateCommandBase).IsAssignableFrom(prop.PropertyType));
+            foreach (var property in commandProperties)
+            {
+                if (property.GetValue(this) is DelegateCommandBase command)
+                {
+                    cachedCommands.Add(command);
+                }
+            }
+        }
 
         public async Task RegisterAndLoadDevicesAsync()
         {
             IsBusy = true;
             try
             {
-                await Task.Run(() => RegisterDevices());
+                await RegisterDevicesAsync();
                 await LoadDevicesAsync();
             }
             finally
@@ -128,17 +148,17 @@ namespace DeviceMonitoring.UI
         /// <remarks>This method generates unique identifiers for each device and assigns them a name in
         /// the format  "Temperature Sensor {prefix}", where {prefix} is the first five characters of the generated
         /// identifier.  The devices are registered as temperature sensors.</remarks>
-        private void RegisterDevices()
+        private async Task RegisterDevicesAsync()
         {
-            var count = m_configuration.GetValue<int>("DeviceSettings:DeviceRegistrationCount");
-            for (int i = 0; i < count; i++)
+            await Task.Run(() =>
             {
-                var id = Guid.NewGuid().ToString();
-                m_deviceMonitoringServiceInstance.RegisterDevice(id, $"Temperature Sensor {id.Substring(0, 5).ToUpper()}", Core.DeviceType.TemperatureSensor);
-                Task.Delay(10).Wait(); // Simulate a delay for device registration
-            }
-
-            IsBusy = false;
+                var count = m_configuration.GetValue<int>("DeviceSettings:DeviceRegistrationCount");
+                for (int i = 0; i < count; i++)
+                {
+                    var id = Guid.NewGuid().ToString();
+                    m_deviceMonitoringServiceInstance.RegisterDevice(id, $"Temperature Sensor {id.Substring(0, 5).ToUpper()}", Core.DeviceType.TemperatureSensor);
+                }
+            });
         }
 
         /// <summary>
@@ -150,17 +170,25 @@ namespace DeviceMonitoring.UI
         /// <returns></returns>
         private async Task LoadDevicesAsync()
         {
-            // Asynchronously retrieve all devices from the device monitoring service
-            // Run background logic
+            // Unsubscribe from previous device events to prevent memory leaks and ensure clean state.
+            if (Devices.Any())
+            {
+                foreach (var deviceModel in Devices)
+                {
+                    if (deviceModel.Device != null)
+                    {
+                        deviceModel.Device.DeviceDataChanged -= OnDeviceDataChanged;
+                        deviceModel.Device.DeviceStateChanged -= OnDeviceStateChanged;
+                    }
+                }
+            }
+
             var deviceModels = await Task.Run(() =>
             {
                 var models = new List<DeviceModel>();
                 foreach (var device in m_deviceMonitoringServiceInstance.GetAllDevices())
                 {
                     models.Add(new DeviceModel(device));
-
-                    device.DeviceDataChanged += OnDeviceDataChanged;
-                    device.DeviceStateChanged += OnDeviceStateChanged;
                 }
 
                 return models;
@@ -169,10 +197,20 @@ namespace DeviceMonitoring.UI
             // Check if devices are not null and contain any items
             if (deviceModels.Count != 0)
             {
-                // Clear the current device list
-                Devices.Clear();
+                // Reset the current device list that results in a single "reset" notification to the UI. 
+                Devices = [];
+                m_deviceMap = [];
+
                 // Add the retrieved device models to the collection
-                deviceModels.ForEach(Devices.Add);
+                deviceModels.ForEach(dm =>
+                {
+                    Devices.Add(dm);
+                    // Populate the dictionary
+                    m_deviceMap[dm.Device.Id] = dm;
+
+                    dm.Device.DeviceDataChanged += OnDeviceDataChanged;
+                    dm.Device.DeviceStateChanged += OnDeviceStateChanged;
+                });
             }
         }
 
@@ -181,8 +219,15 @@ namespace DeviceMonitoring.UI
         /// </summary>
         private void OnDeviceStateChanged(object? sender, DeviceMonitorStateChangedEventArgs e)
         {
-            var device = Devices.FirstOrDefault(d => d.Device.Id.Equals(e.DeviceId));
-            device?.TriggerStateChanged();
+            // Dispatch to UI thread if needed
+            if (!Dispatcher.CurrentDispatcher.CheckAccess())
+            {
+                Dispatcher.CurrentDispatcher.Invoke(() => OnDeviceStateChanged(sender, e));
+                return;
+            }
+
+            if (m_deviceMap.TryGetValue(e.DeviceId, out var deviceModel))
+                deviceModel.TriggerStateChanged();
         }
 
         /// <summary>
@@ -190,31 +235,19 @@ namespace DeviceMonitoring.UI
         /// </summary>
         private void OnDeviceDataChanged(object? sender, DeviceDataChangedEventArgs e)
         {
-            var device = Devices.FirstOrDefault(d => d.Device.Id.Equals(e.DeviceId));
-            device?.TriggerDataChanged();
+            // Dispatch to UI thread if needed
+            if(!Dispatcher.CurrentDispatcher.CheckAccess())
+            {
+                Dispatcher.CurrentDispatcher.Invoke(() => OnDeviceDataChanged(sender, e));
+                return;
+            }
+
+            if (m_deviceMap.TryGetValue(e.DeviceId, out var deviceModel))
+                deviceModel.TriggerDataChanged();
 
             // Trigger graph update.
             if (LiveGraph.IsVisible && LiveGraph.SelectedDevice != null && LiveGraph.SelectedDevice.Id.Equals(e.DeviceId))
                 LiveGraph.AddDataPoint(e.NewValue);
-        }
-
-        /// <summary>
-        /// Determines whether the specified device ID is valid and retrieves the corresponding device model if found.
-        /// </summary>
-        /// <returns><see langword="true"/> if the specified device ID is valid and a matching device model is found; otherwise,
-        /// <see langword="false"/>.</returns>
-        private bool IsValidDeviceId(string? deviceId, out DeviceModel? device)
-        {
-            device = null;
-
-            if (!string.IsNullOrEmpty(deviceId.Trim()) && 
-                Devices != null && 
-                Devices.Any())
-            {
-                device = Devices?.FirstOrDefault(d => d.Device.Id.Equals(deviceId));
-                return (device != null);
-            }
-            return false;
         }
 
         #region Command Implementation
@@ -225,10 +258,9 @@ namespace DeviceMonitoring.UI
         /// <param name="deviceId">The unique identifier of the device to evaluate.</param>
         private bool CanExecuteStartMonitoringCommand(string? deviceId)
         {
-            if (Devices != null && !string.IsNullOrEmpty(deviceId))
+            if (!string.IsNullOrEmpty(deviceId) && m_deviceMap.TryGetValue(deviceId, out var device))
             {
-                var device = Devices.FirstOrDefault(d => d.Device.Id.Equals(deviceId));
-                return device != null && device.Device.DeviceMonitorState != Core.DeviceMonitorState.Monitoring;
+                return device != null && !device.Device.DeviceMonitorState.Equals(Core.DeviceMonitorState.Monitoring);
             }
             return false;
         }
@@ -239,9 +271,8 @@ namespace DeviceMonitoring.UI
         /// <param name="deviceId">The unique identifier of the device to evaluate.</param>
         private bool CanExecuteStopMonitoringCommand(string? deviceId)
         {
-            if (Devices != null && !string.IsNullOrEmpty(deviceId))
+            if (!string.IsNullOrEmpty(deviceId) && m_deviceMap.TryGetValue(deviceId, out var device))
             {
-                var device = Devices.FirstOrDefault(d => d.Device.Id.Equals(deviceId));
                 return device != null && device.Device.DeviceMonitorState.Equals(Core.DeviceMonitorState.Monitoring);
             }
             return false;
@@ -253,11 +284,11 @@ namespace DeviceMonitoring.UI
         /// <param name="deviceId"> The unique identifier of the device to evaluate.</param>
         private bool CanExecuteViewLiveGraphCommand(string? deviceId)
         {
-            if (Devices != null && !string.IsNullOrEmpty(deviceId))
+            if (!string.IsNullOrEmpty(deviceId) && m_deviceMap.TryGetValue(deviceId, out var device))
             {
-                var device = Devices.FirstOrDefault(d => d.Device.Id.Equals(deviceId));
                 return device != null && device.Device.DeviceMonitorState.Equals(Core.DeviceMonitorState.Monitoring);
             }
+
             return false;
         }
 
@@ -285,7 +316,7 @@ namespace DeviceMonitoring.UI
         {
             try
             {
-                if (!IsValidDeviceId(deviceId, out _))
+                if (string.IsNullOrEmpty(deviceId) || !m_deviceMap.TryGetValue(deviceId, out _))
                     return;
 
                 m_deviceMonitoringServiceInstance.StartMonitoring(deviceId);
@@ -298,7 +329,8 @@ namespace DeviceMonitoring.UI
             finally
             {
                 // Re-evaluate command states after starting the device
-                ReEvaluateCommands(this.GetType());
+                (StopDeviceMonitoringCommand as DelegateCommandBase)?.RaiseCanExecuteChanged();
+                (ViewLiveGraphCommand as DelegateCommandBase)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -309,7 +341,7 @@ namespace DeviceMonitoring.UI
         {
             try
             {
-                if (!IsValidDeviceId(deviceId, out _))
+                if (string.IsNullOrEmpty(deviceId) || !m_deviceMap.TryGetValue(deviceId, out _))
                     return;
 
                 m_deviceMonitoringServiceInstance.StopMonitoring(deviceId);
@@ -322,7 +354,8 @@ namespace DeviceMonitoring.UI
             finally
             {
                 // Re-evaluate command states after starting the device
-                ReEvaluateCommands(this.GetType());
+                (StartDeviceMonitoringCommand as DelegateCommandBase)?.RaiseCanExecuteChanged();
+                (ViewLiveGraphCommand as DelegateCommandBase)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -333,7 +366,7 @@ namespace DeviceMonitoring.UI
         {
             try
             {
-                if (!IsValidDeviceId(deviceId, out DeviceModel? device))
+                if (string.IsNullOrEmpty(deviceId) || !m_deviceMap.TryGetValue(deviceId, out DeviceModel? deviceModel))
                     return;
 
                 // Set the graph visibility flag to True if it is not already set
@@ -341,8 +374,8 @@ namespace DeviceMonitoring.UI
                     LiveGraph.IsVisible = true;
 
                 // Configure the live graph for the selected device
-                if (device != null && (LiveGraph.SelectedDevice == null || LiveGraph.SelectedDevice.Id != device.Device.Id))
-                    LiveGraph.ConfigureForDevice(device.Device);
+                if (deviceModel is not null && (LiveGraph.SelectedDevice == null || !LiveGraph.SelectedDevice.Id.Equals(deviceModel.Device.Id)))
+                    LiveGraph.ConfigureForDevice(deviceModel.Device);
             }
             catch (Exception ex)
             {
@@ -351,7 +384,7 @@ namespace DeviceMonitoring.UI
             finally
             {
                 // Re-evaluate command states after starting the device
-                ReEvaluateCommands(this.GetType());
+                (HideLiveGraphCommand as DelegateCommandBase)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -375,7 +408,7 @@ namespace DeviceMonitoring.UI
             finally
             {
                 // Re-evaluate command states after hiding the graph
-                ReEvaluateCommands(this.GetType());
+                (ViewLiveGraphCommand as DelegateCommandBase)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -387,7 +420,7 @@ namespace DeviceMonitoring.UI
             try
             {
                 var fileName = await m_exportService.ExportAsync(Devices);
-                if (string.IsNullOrEmpty(fileName))
+                if (!string.IsNullOrEmpty(fileName))
                     m_notificationManger.ShowMessage($"File exported! {fileName}");
             }
             catch (Exception ex)
@@ -397,8 +430,43 @@ namespace DeviceMonitoring.UI
             finally
             {
                 // Re-evaluate command states after exporting data
-                ReEvaluateCommands(this.GetType());
+                (ExportToJsonCommand as DelegateCommandBase)?.RaiseCanExecuteChanged();
+                (ExportToCSVCommand as DelegateCommandBase)?.RaiseCanExecuteChanged();
             }
+        }
+
+        /// <summary>
+        /// Releases the resources used by the current instance of the <see cref="MainWindowViewModel"/> class.
+        /// </summary>
+        /// <remarks>This method unsubscribes from device events, clears internal collections, and
+        /// disposes of any disposable resources. It should be called when the instance is no longer needed to free up
+        /// resources.</remarks>
+        public void Dispose()
+        {
+            if (_isDisposed || Devices is null)
+                return;
+
+            // Unsubscribe from device events
+            foreach (var deviceModel in Devices)
+            {
+                if (deviceModel.Device is null)
+                    continue;
+
+                deviceModel.Device.DeviceDataChanged -= OnDeviceDataChanged;
+                deviceModel.Device.DeviceStateChanged -= OnDeviceStateChanged;
+            }
+
+            // Clear the collection and map
+            Devices?.Clear();
+            m_deviceMap?.Clear();
+            LiveGraph?.Clear();
+
+            // Dispose of the LiveGraphManager if it implements IDisposable
+            // (LiveGraph as IDisposable)?.Dispose();
+
+
+            GC.SuppressFinalize(this);
+            _isDisposed = true;
         }
 
         #endregion

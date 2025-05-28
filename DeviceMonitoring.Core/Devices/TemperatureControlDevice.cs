@@ -75,13 +75,13 @@ namespace DeviceMonitoring.Core.Devices
         /// </summary>
         /// <remarks>This method generates a new random temperature value and updates the device's current
         /// temperature. The temperature value is a double within the range of 0 to 100.0001.</remarks>
-        public void PerformDeviceOperation()
+        public async Task PerformDeviceOperation()
         {
             if (DeviceMonitorState != DeviceMonitorState.Monitoring)
                 return;
 
             // Update the current temperature and record the time of the update
-            m_CurrentTemperature = GetNewTemperatureFromDevice();
+            m_CurrentTemperature = await GetNewTemperatureFromDevice();
 
             // Invoke the DataChanged event to notify subscribers of the temperature change
             DeviceDataChanged?.Invoke(this, new DeviceDataChangedEventArgs(Id, m_CurrentTemperature));  
@@ -91,8 +91,12 @@ namespace DeviceMonitoring.Core.Devices
         /// Retrieves a new temperature reading from the device.
         /// </summary>
         /// <returns>A string representation of the temperature value retrieved from the device.</returns>
-        private double GetNewTemperatureFromDevice()
+        private async Task<double> GetNewTemperatureFromDevice()
         {
+            // Simulate actual asynchronous I/O, e.g., reading from a sensor
+            // For simulation, we can use Task.Delay
+            await Task.Delay(TimeSpan.FromMilliseconds(10)); // Simulate I/O latency
+
             // Simulate in this case for now.
             return m_randTemp.NextDouble() * 100.01;
         }

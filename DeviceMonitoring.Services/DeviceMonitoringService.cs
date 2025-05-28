@@ -14,7 +14,6 @@ namespace DeviceMonitoring.Services
 
         private readonly CancellationTokenSource m_cts;
         private Task m_deviceMonitor;
-        private readonly object _lock = new();
         #endregion
 
         #region Events/Actions
@@ -80,6 +79,7 @@ namespace DeviceMonitoring.Services
 
             // Create a new monitoring entry for the device.
             var entry = new DeviceEntry(device, deviceInterval ?? 1000, DateTime.Now);
+            entry.SubscribeToStateChanged((s, e) => DeviceMonitorStateChanged?.Invoke(s, e));
 
             // Add the device to the monitoring map. If the device ID already exists, throw an exception.
             if (!m_monitoringMap.TryAdd(deviceId, entry))
@@ -106,9 +106,8 @@ namespace DeviceMonitoring.Services
                 return;
             }
 
-            // Unsubscribe from the device events.
-            entry.Device.DeviceDataChanged -= (s, e) => DeviceDataChanged?.Invoke(s, e);
-            entry.Device.DeviceStateChanged -= (s, e) => DeviceMonitorStateChanged?.Invoke(s, e);
+            // Dispose the entry.
+            entry.Dispose();
         }
 
         /// <summary>
@@ -159,14 +158,12 @@ namespace DeviceMonitoring.Services
             if (string.IsNullOrEmpty(id))
                 return;
 
-            // Get the device from the monitoring map
-            var device = GetDevice(id);
-            if (device is null)
+            // TryGet the device from the monitoring map
+            if (!m_monitoringMap.TryGetValue(id, out DeviceEntry? entry))
                 return;
 
-            //Subscribe to DeviceDataChanged event and update device state to Monitoring.
-            device.DeviceDataChanged += (s, e) => DeviceDataChanged?.Invoke(s, e);
-            device.UpdateDeviceState(DeviceMonitorState.Monitoring);
+            entry.SubscribeToDataChanged((s, e) => DeviceDataChanged?.Invoke(s, e));
+            entry.Device.UpdateDeviceState(DeviceMonitorState.Monitoring);
         }
 
         /// <summary>
@@ -183,14 +180,12 @@ namespace DeviceMonitoring.Services
             if (string.IsNullOrEmpty(id))
                 return;
 
-            // Get the device from the monitoring map
-            var device = GetDevice(id);
-            if (device is null)
+            // TryGet the device from the monitoring map
+            if (!m_monitoringMap.TryGetValue(id, out DeviceEntry? entry))
                 return;
 
-            //Unsubscribe to DeviceDataChanged event and update device state to Stopped.
-            device.DeviceDataChanged -= (s, e) => DeviceDataChanged?.Invoke(s, e);
-            device.UpdateDeviceState(DeviceMonitorState.Stopped);
+            entry.UnsubscribeFromDataChanged((s, e) => DeviceDataChanged?.Invoke(s, e));
+            entry.Device.UpdateDeviceState(DeviceMonitorState.Stopped);
         }
 
         #region Private methods
@@ -212,32 +207,39 @@ namespace DeviceMonitoring.Services
                 try
                 {
                     var now = DateTime.Now;
+                    double minWait = double.MaxValue;
+
                     foreach (DeviceEntry entry in m_monitoringMap.Values)
                     {
                         var device = entry.Device;
-                        if (device is null)
-                            continue;
-
-                        if (!entry.Device.DeviceMonitorState.Equals(DeviceMonitorState.Monitoring))
+                        if (device is null || 
+                            device.DeviceMonitorState != DeviceMonitorState.Monitoring)
                             continue;
 
                         // Check if the device is ready for an update.
                         var elapsed = (now - entry.LastUpdated).TotalMilliseconds;
+                        var wait = entry.Interval - elapsed;
+
                         if (elapsed >= entry.Interval)
                         {
                             // Perform device operation.
-                            device.PerformDeviceOperation();
+                            await device.PerformDeviceOperation();
                             entry.LastUpdated = now;
+                            wait = entry.Interval; // After update, next due in full interval
                         }
+
+                        if (wait < minWait)
+                            minWait = wait;
                     }
+
+                    // Wait until the next device is due, but not less than 10ms
+                    var delay = Math.Max(10, (int)minWait);
+                    await Task.Delay(delay, token);
                 }
                 catch(Exception ex)
                 {
                     Console.WriteLine($"Method:{nameof(MonitorDevices)}, Error:{ex}");
                 }
-
-                // Add Delay to adjust CPU load.
-                await Task.Delay(10, token);
             }
         } 
 
@@ -256,6 +258,13 @@ namespace DeviceMonitoring.Services
             m_cts.Cancel();
             m_deviceMonitor.Wait();
             m_cts.Dispose();
+
+            // Dispose of all device entries in the monitoring map.
+            foreach (var entry in m_monitoringMap.Values)
+            {
+                entry.Dispose();
+            }
+            m_monitoringMap.Clear();
         }
 
         #endregion
